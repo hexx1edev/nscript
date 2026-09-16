@@ -1,7 +1,8 @@
 from sys import argv
 from util.print import eprint
 from colorama import just_fix_windows_console
-from lang import lexer
+import lang.lexer
+import lang.parser
 
 def main() -> int:
     just_fix_windows_console()
@@ -13,7 +14,7 @@ def main() -> int:
     source = ""
 
     try:
-        file = open(argv[1], "r")
+        file = open(argv[1])
         source = file.read()
     except FileNotFoundError:
         eprint(f"failed to open `{argv[0]}`: file not found")
@@ -25,15 +26,21 @@ def main() -> int:
         eprint(f"failed to open `{argv[0]}`: OS error: {err}")
         return 1
 
-    _lexer = lexer.Lexer(source)
+    lexer = lang.lexer.Lexer(source)
 
-    tokens, error, ok = _lexer.tokenize()
-
-    if not ok:
-        eprint(f"tokenization failed: {error}")
+    tokens, error = lexer.tokenize()
+    if error is not None:
+        eprint(error)
         return 1
 
-    print(tokens)
+    parser = lang.parser.Parser(tokens)
+
+    program, error = parser.parse()
+    if error is not None:
+        eprint(error)
+        return 1
+
+    print(program)
 
     return 0
 

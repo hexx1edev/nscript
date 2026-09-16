@@ -19,7 +19,13 @@ class Token:
         self.kind = kind
 
     def __repr__(self) -> str:
-        return f"{self.kind.name}"
+        return self.kind.name
+
+    def name(self) -> str:
+        return self.kind.name
+
+    def value(self) -> None:
+        pass
 
 class Keyword(Token):
     keyword: str
@@ -31,25 +37,49 @@ class Keyword(Token):
     def __repr__(self) -> str:
         return f"Keyword({self.keyword})"
 
-class Identifier(Token):
-    name: str
+    def name(self) -> str:
+        return "keyword"
 
-    def __init__(self, name: str) -> None:
+    def value(self) -> str:
+        return self.keyword
+
+class Identifier(Token):
+    ident: str
+
+    def __init__(self, ident: str) -> None:
         super().__init__(TokenKind.Identifier)
-        self.name = name
+        self.ident = ident
 
     def __repr__(self) -> str:
-        return f"Identifier({self.name})"
+        return f"Identifier({self.ident})"
+
+    def name(self) -> str:
+        return "identifier"
+
+    def value(self) -> str:
+        return self.ident
 
 class LParen(Token):
     def __init__(self) -> None:
         super().__init__(TokenKind.LParen)
+
+    def name(self) -> str:
+        return "left parenthesis"
+
+    def value(self) -> None:
+        return None
 
     # doesn't need to override __repr__ as it will be the same
 
 class RParen(Token):
     def __init__(self) -> None:
         super().__init__(TokenKind.RParen)
+
+    def name(self) -> str:
+        return "right parenthesis"
+
+    def value(self) -> None:
+        return None
 
     # doesn't need to override __repr__ as it will be the same
 
@@ -63,15 +93,33 @@ class Operator(Token):
     def __repr__(self) -> str:
         return f"Operator({self.operator})"
 
+    def name(self) -> str:
+        return "operator"
+
+    def value(self) -> str:
+        return self.operator
+
 class LBrace(Token):
     def __init__(self) -> None:
         super().__init__(TokenKind.LBrace)
+
+    def name(self) -> str:
+        return "left bracket"
+
+    def value(self) -> None:
+        return None
 
     # doesn't need to override __repr__ as it will be the same
 
 class RBrace(Token):
     def __init__(self) -> None:
         super().__init__(TokenKind.RBrace)
+
+    def name(self) -> str:
+        return "right bracket"
+
+    def value(self) -> None:
+        return None
 
     # doesn't need to override __repr__ as it will be the same
 
@@ -85,8 +133,20 @@ class Number(Token):
     def __repr__(self) -> str:
         return f"Number({self.number})"
 
+    def name(self) -> str:
+        return "number"
+
+    def value(self) -> int:
+        return self.number
+
 class Semicolon(Token):
     def __init__(self) -> None:
         super().__init__(TokenKind.Semicolon)
+
+    def name(self) -> str:
+        return "semicolon"
+
+    def value(self) -> None:
+        return None
 
     # doesn't need to override __repr__ as it will be the same
