@@ -21,3 +21,18 @@ class Return(ASTNode):
 @dataclass
 class NumberLiteral(ASTNode):
     value: int
+
+@dataclass
+class Identifier(ASTNode):
+    name: str
+
+@dataclass
+class BinaryOperation(ASTNode):
+    left: ASTNode
+    operator: str
+    right: ASTNode
+
+@dataclass
+class UnaryOperation(ASTNode):
+    operator: str
+    right: ASTNode

@@ -14,139 +14,50 @@ class TokenKind(Enum):
 
 class Token:
     kind: TokenKind
+    value: any
 
-    def __init__(self, kind: TokenKind) -> None:
+    def __init__(self, kind: TokenKind, value: any) -> None:
         self.kind = kind
+        self.value = value
 
     def __repr__(self) -> str:
-        return self.kind.name
+        match self.kind:
+            case TokenKind.Keyword:
+                return f"Keyword({self.value})"
+            case TokenKind.Identifier:
+                return f"Identifier({self.value})"
+            case TokenKind.Operator:
+                return f"Operator({self.value})"
+            case TokenKind.LParen:
+                return "LParen"
+            case TokenKind.RParen:
+                return "RParen"
+            case TokenKind.LBrace:
+                return "LBrace"
+            case TokenKind.RBrace:
+                return "RBrace"
+            case TokenKind.Number:
+                return f"Number({self.value})"
+            case TokenKind.Semicolon:
+                return "Semicolon"
 
     def name(self) -> str:
-        return self.kind.name
-
-    def value(self) -> None:
-        pass
-
-class Keyword(Token):
-    keyword: str
-
-    def __init__(self, keyword: str) -> None:
-        super().__init__(TokenKind.Keyword)
-        self.keyword = keyword
-
-    def __repr__(self) -> str:
-        return f"Keyword({self.keyword})"
-
-    def name(self) -> str:
-        return "keyword"
-
-    def value(self) -> str:
-        return self.keyword
-
-class Identifier(Token):
-    ident: str
-
-    def __init__(self, ident: str) -> None:
-        super().__init__(TokenKind.Identifier)
-        self.ident = ident
-
-    def __repr__(self) -> str:
-        return f"Identifier({self.ident})"
-
-    def name(self) -> str:
-        return "identifier"
-
-    def value(self) -> str:
-        return self.ident
-
-class LParen(Token):
-    def __init__(self) -> None:
-        super().__init__(TokenKind.LParen)
-
-    def name(self) -> str:
-        return "left parenthesis"
-
-    def value(self) -> None:
-        return None
-
-    # doesn't need to override __repr__ as it will be the same
-
-class RParen(Token):
-    def __init__(self) -> None:
-        super().__init__(TokenKind.RParen)
-
-    def name(self) -> str:
-        return "right parenthesis"
-
-    def value(self) -> None:
-        return None
-
-    # doesn't need to override __repr__ as it will be the same
-
-class Operator(Token):
-    operator: str
-
-    def __init__(self, operator: str) -> None:
-        super().__init__(TokenKind.Operator)
-        self.operator = operator
-
-    def __repr__(self) -> str:
-        return f"Operator({self.operator})"
-
-    def name(self) -> str:
-        return "operator"
-
-    def value(self) -> str:
-        return self.operator
-
-class LBrace(Token):
-    def __init__(self) -> None:
-        super().__init__(TokenKind.LBrace)
-
-    def name(self) -> str:
-        return "left bracket"
-
-    def value(self) -> None:
-        return None
-
-    # doesn't need to override __repr__ as it will be the same
-
-class RBrace(Token):
-    def __init__(self) -> None:
-        super().__init__(TokenKind.RBrace)
-
-    def name(self) -> str:
-        return "right bracket"
-
-    def value(self) -> None:
-        return None
-
-    # doesn't need to override __repr__ as it will be the same
-
-class Number(Token):
-    number: int
-
-    def __init__(self, number: int) -> None:
-        super().__init__(TokenKind.Number)
-        self.number = number
-
-    def __repr__(self) -> str:
-        return f"Number({self.number})"
-
-    def name(self) -> str:
-        return "number"
-
-    def value(self) -> int:
-        return self.number
-
-class Semicolon(Token):
-    def __init__(self) -> None:
-        super().__init__(TokenKind.Semicolon)
-
-    def name(self) -> str:
-        return "semicolon"
-
-    def value(self) -> None:
-        return None
-
-    # doesn't need to override __repr__ as it will be the same
+        match self.kind:
+            case TokenKind.Keyword:
+                return "keyword"
+            case TokenKind.Identifier:
+                return "identifier"
+            case TokenKind.Operator:
+                return "operator"
+            case TokenKind.LParen:
+                return "left parenthesis"
+            case TokenKind.RParen:
+                return "right parenthesis"
+            case TokenKind.LBrace:
+                return "left bracket"
+            case TokenKind.RBrace:
+                return "right bracket"
+            case TokenKind.Number:
+                return "number"
+            case TokenKind.Semicolon:
+                return "semicolon"

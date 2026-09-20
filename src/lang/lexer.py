@@ -64,19 +64,19 @@ class Lexer:
                     return tokens, error
                 tokens.append(token)
             elif current == "(":
-                tokens.append(tok.LParen())
+                tokens.append(tok.Token(tok.TokenKind.LParen, "("))
                 self.next()
             elif current == ")":
-                tokens.append(tok.RParen())
+                tokens.append(tok.Token(tok.TokenKind.RParen, ")"))
                 self.next()
             elif current == "{":
-                tokens.append(tok.LBrace())
+                tokens.append(tok.Token(tok.TokenKind.LBrace, "{"))
                 self.next()
             elif current == "}":
-                tokens.append(tok.RBrace())
+                tokens.append(tok.Token(tok.TokenKind.RBrace, "}"))
                 self.next()
             elif current == ";":
-                tokens.append(tok.Semicolon())
+                tokens.append(tok.Token(tok.TokenKind.Semicolon, ";"))
                 self.next()
             elif current in ("\n", "\r\n", " ", "\t"):
                 self.next()
@@ -95,11 +95,11 @@ class Lexer:
             ident += self.consume()
 
         if ident in keywords.KEYWORDS:
-            return tok.Keyword(ident), None
+            return tok.Token(tok.TokenKind.Keyword, ident), None
         else:
-            return tok.Identifier(ident), None
+            return tok.Token(tok.TokenKind.Identifier, ident), None
 
-    def read_number(self) -> tuple[tok.Number | None, LexerError | None]:
+    def read_number(self) -> tuple[tok.Token | None, LexerError | None]:
         num = ""
 
         while self.current().isnumeric():
@@ -108,9 +108,9 @@ class Lexer:
         if self.current().isalpha():
             return None, LexerError(LexerErrorKind.InvalidNumber, self.current())
 
-        return tok.Number(int(num)), None
+        return tok.Token(tok.TokenKind.Number, int(num)), None
 
-    def read_operator(self) -> tuple[tok.Operator | None, LexerError | None]:
+    def read_operator(self) -> tuple[tok.Token | None, LexerError | None]:
         op = ""
 
         if self.current() not in operators.BASE:
@@ -134,4 +134,4 @@ class Lexer:
                 )
             )
 
-        return tok.Operator(op), None
+        return tok.Token(tok.TokenKind.Operator, op), None
