@@ -1,5 +1,6 @@
 from sys import argv
 from util.print import eprint
+from util.diagnostic import render
 from colorama import just_fix_windows_console
 import lang.lexer
 import lang.parser
@@ -30,14 +31,14 @@ def main() -> int:
 
     tokens, error = lexer.tokenize()
     if error is not None:
-        eprint(error)
+        print(render(source, error.span, str(error), argv[1]))
         return 1
 
     parser = lang.parser.Parser(tokens)
 
     program, error = parser.parse()
     if error is not None:
-        eprint(error)
+        print(render(source, error.span, str(error), argv[1]))
         return 1
 
     print(program)

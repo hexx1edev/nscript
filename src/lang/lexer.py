@@ -1,5 +1,6 @@
 from lang.token import Token, TokenKind
 from lang import defs
+from lang.span import Span
 from enum import Enum
 
 
@@ -11,10 +12,12 @@ class LexerErrorKind(Enum):
 class LexerError:
     kind: LexerErrorKind
     value: str
+    span: Span | None
 
-    def __init__(self, kind: LexerErrorKind, value: str) -> None:
+    def __init__(self, kind: LexerErrorKind, value: str, span: Span | None = None) -> None:
         self.kind = kind
         self.value = value
+        self.span = span
 
     def __repr__(self) -> str:
         match self.kind:
@@ -64,22 +67,22 @@ class Lexer:
                     return tokens, error
                 tokens.append(token)
             elif current == "(":
-                tokens.append(Token(TokenKind.LParen, "("))
+                tokens.append(Token(TokenKind.LParen, "(", Span(self.pos, self.pos + 1)))
                 self.next()
             elif current == ")":
-                tokens.append(Token(TokenKind.RParen, ")"))
+                tokens.append(Token(TokenKind.RParen, ")", Span(self.pos, self.pos + 1)))
                 self.next()
             elif current == "{":
-                tokens.append(Token(TokenKind.LBrace, "{"))
+                tokens.append(Token(TokenKind.LBrace, "{", Span(self.pos, self.pos + 1)))
                 self.next()
             elif current == "}":
-                tokens.append(Token(TokenKind.RBrace, "}"))
+                tokens.append(Token(TokenKind.RBrace, "}", Span(self.pos, self.pos + 1)))
                 self.next()
             elif current == ";":
-                tokens.append(Token(TokenKind.Semicolon, ";"))
+                tokens.append(Token(TokenKind.Semicolon, ";", Span(self.pos, self.pos + 1)))
                 self.next()
             elif current == ":":
-                tokens.append(Token(TokenKind.Colon, ":"))
+                tokens.append(Token(TokenKind.Colon, ":", Span(self.pos, self.pos + 1)))
                 self.next()
             elif current in ("\n", "\r\n", " ", "\t"):
                 self.next()
@@ -92,28 +95,35 @@ class Lexer:
         return tokens, None
 
     def read_identifier(self) -> tuple[Token | None, LexerError | None]:
+        start = self.pos
         ident = ""
 
         while self.current().isalnum():
             ident += self.consume()
 
         if ident in defs.KEYWORDS:
-            return Token(TokenKind.Keyword, ident), None
+            return Token(TokenKind.Keyword, ident, Span(start, self.pos)), None
         else:
-            return Token(TokenKind.Identifier, ident), None
+            return Token(TokenKind.Identifier, ident, Span(start, self.pos)), None
 
     def read_number(self) -> tuple[Token | None, LexerError | None]:
+        start = self.pos
         num = ""
 
         while self.current().isnumeric():
             num += self.consume()
 
         if self.current().isalpha():
-            return None, LexerError(LexerErrorKind.InvalidNumber, self.current())
+            return None, LexerError(
+                LexerErrorKind.InvalidNumber,
+                self.current(),
+                Span(start, self.pos + 1)
+            )
 
-        return Token(TokenKind.Number, int(num)), None
+        return Token(TokenKind.Number, int(num), Span(start, self.pos)), None
 
     def read_operator(self) -> tuple[Token | None, LexerError | None]:
+        start = self.pos
         op = ""
 
         if self.current() not in defs.BASE:
@@ -121,7 +131,8 @@ class Lexer:
                 None,
                 LexerError(
                     LexerErrorKind.UnknownSymbol,
-                    self.current()
+                    self.current(),
+                    Span(start, start + 1)
                 )
             )
 
@@ -133,8 +144,9 @@ class Lexer:
                 None,
                 LexerError(
                     LexerErrorKind.InvalidOperator,
-                    op
+                    op,
+                    Span(start, self.pos)
                 )
             )
 
-        return Token(TokenKind.Operator, op), None
+        return Token(TokenKind.Operator, op, Span(start, self.pos)), None

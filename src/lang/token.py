@@ -1,4 +1,5 @@
 from enum import Enum
+from lang.span import Span
 
 
 class TokenKind(Enum):
@@ -16,10 +17,12 @@ class TokenKind(Enum):
 class Token:
     kind: TokenKind
     value: any
+    span: Span | None
 
-    def __init__(self, kind: TokenKind, value: any) -> None:
+    def __init__(self, kind: TokenKind, value: any, span: Span | None = None) -> None:
         self.kind = kind
         self.value = value
+        self.span = span
 
     def __repr__(self) -> str:
         match self.kind:

@@ -1,8 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from lang.span import Span
 
 
+@dataclass
 class ASTNode:
-    pass
+    span: Span | None = field(default=None, kw_only=True, compare=False, repr=False)
 
 @dataclass
 class Program(ASTNode):

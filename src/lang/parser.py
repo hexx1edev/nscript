@@ -1,6 +1,7 @@
 from lang import ast, defs
 from enum import Enum
 from lang.token import TokenKind, Token
+from lang.span import Span
 
 PREFIX_OPERATORS = ("+", "-") + defs.UNARY_OPERATORS
 
@@ -14,16 +15,19 @@ class ParserError(Exception):
     kind: ParserErrorKind
     value: str
     message: str
+    span: Span | None
 
     def __init__(
         self,
         kind: ParserErrorKind,
         value: str = "",
-        message: str = ""
+        message: str = "",
+        span: Span | None = None
     ) -> None:
         self.kind = kind
         self.value = value
         self.message = message
+        self.span = span
 
     def __str__(self) -> str:
         match self.kind:
@@ -37,16 +41,17 @@ class ParserError(Exception):
 
 
 class UnexpectedEOF(ParserError):
-    def __init__(self) -> None:
-        super().__init__(ParserErrorKind.UnexpectedEOF)
+    def __init__(self, span: Span | None = None) -> None:
+        super().__init__(ParserErrorKind.UnexpectedEOF, span=span)
 
 
 class InvalidSyntax(ParserError):
-    def __init__(self, value: str, message: str) -> None:
+    def __init__(self, value: str, message: str, span: Span | None = None) -> None:
         super().__init__(
             ParserErrorKind.InvalidSyntax,
             value,
-            message
+            message,
+            span
         )
 
 
@@ -60,9 +65,18 @@ class Parser:
 
     def peek(self) -> Token:
         if self.pos >= len(self.tokens):
-            raise UnexpectedEOF()
+            raise UnexpectedEOF(self.eof_span())
 
         return self.tokens[self.pos]
+
+    def eof_span(self) -> Span:
+        if not self.tokens:
+            return Span(0, 0)
+        end = self.tokens[-1].span.end
+        return Span(end, end)
+
+    def prev_span(self) -> Span:
+        return self.tokens[self.pos - 1].span
 
     def advance(self) -> Token:
         token = self.peek()
@@ -99,7 +113,7 @@ class Parser:
             if message is not None:
                 msg = message
 
-            raise InvalidSyntax(token.value, msg)
+            raise InvalidSyntax(token.value, msg, token.span)
 
         if advance:
             self.advance()
@@ -113,7 +127,7 @@ class Parser:
             return None, error
 
     def parse_program(self) -> ast.Program:
-        program = ast.Program([])
+        program = ast.Program([], span=Span(0, self.eof_span().end))
 
         while self.pos < len(self.tokens):
             func = self.parse_function()
@@ -124,7 +138,7 @@ class Parser:
     def parse_function(self) -> ast.Function:
         func = ast.Function("", "?", [])
 
-        self.expect(TokenKind.Keyword, "fn")
+        start = self.expect(TokenKind.Keyword, "fn").span
 
         name = self.expect(
             TokenKind.Identifier,
@@ -155,7 +169,8 @@ class Parser:
             case _:
                 raise InvalidSyntax(
                     token.value,
-                    "expected function body"
+                    "expected function body",
+                    token.span
                 )
 
         self.expect(
@@ -165,6 +180,7 @@ class Parser:
         )
 
         func.body = self.parse_block()
+        func.span = start.to(self.prev_span())
 
         return func
 
@@ -203,16 +219,17 @@ class Parser:
 
         raise InvalidSyntax(
             token.value,
-            "invalid statement"
+            "invalid statement",
+            token.span
         )
 
     def parse_return(self) -> ast.Return:
-        self.expect(TokenKind.Keyword, "return")
+        start = self.expect(TokenKind.Keyword, "return").span
 
         expression = self.parse_expression()
-        self.expect(TokenKind.Semicolon)
+        end = self.expect(TokenKind.Semicolon).span
 
-        return ast.Return(expression)
+        return ast.Return(expression, span=start.to(end))
 
     def parse_expression(self) -> ast.ASTNode:
         return self.parse_additive()
@@ -220,16 +237,18 @@ class Parser:
     def parse_primary(self) -> ast.ASTNode:
         token = self.advance()
         if token.kind == TokenKind.Number:
-            return ast.NumberLiteral(token.value)
+            return ast.NumberLiteral(token.value, span=token.span)
         if token.kind == TokenKind.Identifier:
-            return ast.Identifier(token.value)
+            return ast.Identifier(token.value, span=token.span)
         if token.kind == TokenKind.LParen:
             expr = self.parse_expression()
-            self.expect(TokenKind.RParen)
+            end = self.expect(TokenKind.RParen).span
+            expr.span = token.span.to(end)
             return expr
         raise InvalidSyntax(
             token.value,
-            "expected expression"
+            "expected expression",
+            token.span
         )
 
     def parse_unary(self) -> ast.ASTNode:
@@ -238,15 +257,18 @@ class Parser:
             if token.value not in PREFIX_OPERATORS:
                 raise InvalidSyntax(
                     token.value,
-                    "invalid unary operator"
+                    "invalid unary operator",
+                    token.span
                 )
 
-            op = self.advance().value
+            op_token = self.advance()
+            op = op_token.value
             right = self.parse_unary()
+            span = op_token.span.to(right.span)
 
             if isinstance(right, ast.NumberLiteral) and op in ("+", "-"):
-                return ast.NumberLiteral(-right.value if op == "-" else right.value)
-            return ast.UnaryOperation(op, right)
+                return ast.NumberLiteral(-right.value if op == "-" else right.value, span=span)
+            return ast.UnaryOperation(op, right, span=span)
         return self.parse_primary()
 
     def parse_multiplicative(self) -> ast.ASTNode:
@@ -254,7 +276,7 @@ class Parser:
         while self.peek().kind == TokenKind.Operator and self.peek().value in ("*", "/", "%"):
             op = self.advance().value
             right = self.parse_unary()
-            left = ast.BinaryOperation(left, op, right)
+            left = ast.BinaryOperation(left, op, right, span=left.span.to(right.span))
         return left
 
     def parse_additive(self) -> ast.ASTNode:
@@ -262,7 +284,7 @@ class Parser:
         while self.peek().kind == TokenKind.Operator and self.peek().value in ("+", "-"):
             op = self.advance().value
             right = self.parse_multiplicative()
-            left = ast.BinaryOperation(left, op, right)
+            left = ast.BinaryOperation(left, op, right, span=left.span.to(right.span))
         return left
 
     def parse_let(self) -> ast.Let:
@@ -270,7 +292,7 @@ class Parser:
         value = None
         const = False
 
-        self.expect(TokenKind.Keyword, "let")
+        start = self.expect(TokenKind.Keyword, "let").span
 
         if self.peek().kind == TokenKind.Keyword and self.peek().value == "const":
             const = True
@@ -292,22 +314,26 @@ class Parser:
         elif type == "?":
             raise InvalidSyntax(
                 token.value,
-                "expected type annotation or initializer"
+                "expected type annotation or initializer",
+                token.span
             )
 
-        self.expect(TokenKind.Semicolon)
+        end = self.expect(TokenKind.Semicolon).span
 
-        return ast.Let(name, type, value, const)
+        return ast.Let(name, type, value, const, span=start.to(end))
 
     def parse_assignment(self) -> ast.Assignment:
-        destination = ast.Identifier(self.expect(TokenKind.Identifier).value)
+        ident = self.expect(TokenKind.Identifier)
+        destination = ast.Identifier(ident.value, span=ident.span)
 
-        op = self.expect(TokenKind.Operator).value
+        op_token = self.expect(TokenKind.Operator)
+        op = op_token.value
         if op not in defs.ASSIGN_OPERATORS + ("=",):
             raise InvalidSyntax(
                 op,
-                "expected assignment operator"
+                "expected assignment operator",
+                op_token.span
             )
         source = self.parse_expression()
-        self.expect(TokenKind.Semicolon)
-        return ast.Assignment(source, op, destination)
+        end = self.expect(TokenKind.Semicolon).span
+        return ast.Assignment(source, op, destination, span=ident.span.to(end))
