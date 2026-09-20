@@ -42,3 +42,8 @@ class Let(ASTNode):
     name: str
     type: str
     value: ASTNode
+
+@dataclass
+class Assignment(ASTNode):
+    source: ASTNode
+    destination: Identifier

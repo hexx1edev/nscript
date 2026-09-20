@@ -66,6 +66,11 @@ class Parser:
         self.pos += 1
         return token
 
+    def rewind(self) -> Token:
+        token = self.peek()
+        self.pos -= 1
+        return token
+
     def expect(
         self,
         kind: TokenKind,
@@ -182,10 +187,16 @@ class Parser:
                         return self.parse_return()
                     case "let":
                         return self.parse_let()
+            case TokenKind.Identifier:
+                self.advance()
+                next = self.peek()
+                if next.kind == TokenKind.Operator and next.value == "=":
+                    self.rewind()
+                    return self.parse_assignment()
 
         raise InvalidSyntax(
             token.value,
-            "expected statement"
+            "invalid statement"
         )
 
     def parse_return(self) -> ast.Return:
@@ -267,3 +278,10 @@ class Parser:
         self.expect(TokenKind.Semicolon)
 
         return ast.Let(name, type, value)
+
+    def parse_assignment(self) -> ast.Assignment:
+        destination = ast.Identifier(self.expect(TokenKind.Identifier).value)
+        self.expect(TokenKind.Operator, "=")
+        source = self.parse_expression()
+        self.expect(TokenKind.Semicolon)
+        return ast.Assignment(source, destination)
