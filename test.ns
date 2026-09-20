@@ -1,7 +1,5 @@
 fn main() -> i32 {
-    let const x = 2;
-    let const y = 3;
-    let z = add(x, y);
+    let a = true;
 }
 
 fn add(a: i32, b: i32) -> i32 {

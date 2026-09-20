@@ -5,6 +5,18 @@ from lang.span import Span
 
 PREFIX_OPERATORS = ("+", "-") + defs.UNARY_OPERATORS
 
+BINARY_PRECEDENCE = {
+    "||": 1,
+    "^^": 2,
+    "&&": 3,
+    "<": 4, ">": 4, "<=": 4, ">=": 4, "==": 4, "!=": 4,
+    "|": 5,
+    "^": 6,
+    "&": 7,
+    "+": 8, "-": 8,
+    "*": 9, "/": 9, "%": 9,
+}
+UNARY_PRECEDENCE = 10
 
 class ParserErrorKind(Enum):
     InvalidSyntax = 1
@@ -272,65 +284,48 @@ class Parser:
 
         return ast.Return(expression, span=start.to(end))
 
-    def parse_expression(self) -> ast.ASTNode:
-        return self.parse_additive()
+    def parse_expression(self, min_prec: int = 0) -> ast.ASTNode:
+        left = self.parse_unary()
+        while True:
+            token = self.peek()
+            if token.kind != TokenKind.Operator or token.value not in BINARY_PRECEDENCE:
+                break
+            precedence = BINARY_PRECEDENCE[token.value]
+            if precedence < min_prec:
+                break
+            self.advance() # consume operator
+            right = self.parse_expression(precedence + 1)
+            left = ast.BinaryOperation(left, token.value, right, span=left.span.to(right.span))
+        return left
 
-    def parse_primary(self) -> ast.ASTNode:
+    def parse_unary(self):
         token = self.peek()
-        if token.kind == TokenKind.Identifier and self.peek(True).kind == TokenKind.LParen:
-            return self.parse_func_call()
+        if token.kind == TokenKind.Operator and token.value in ("-", "!"):
+            self.next()
+            right = self.parse_expression(UNARY_PRECEDENCE)
+            return ast.UnaryOperation(token.value, right, span=token.span.to(right.span))
+        return self.parse_primary()
 
-        self.advance()
+    def parse_primary(self):
+        token = self.advance()
         if token.kind == TokenKind.Number:
             return ast.NumberLiteral(token.value, span=token.span)
-        if token.kind == TokenKind.Identifier:
+        elif token.kind == TokenKind.Identifier:
+            if self.peek().kind == TokenKind.LParen:
+                self.rewind()
+                return self.parse_func_call()
             return ast.Identifier(token.value, span=token.span)
-        if token.kind == TokenKind.LParen:
-            expr = self.parse_expression()
-            end = self.expect(TokenKind.RParen).span
-            expr.span = token.span.to(end)
-            return expr
+        elif token.kind == TokenKind.LParen:
+            node = self.parse_expression(0)
+            self.expect(TokenKind.RParen)
+            return node
+        elif token.kind == TokenKind.Boolean:
+            return ast.BooleanLiteral(token.value, span=token.span)
         raise InvalidSyntax(
             token.value,
             "expected expression",
             token.span
         )
-
-    def parse_unary(self) -> ast.ASTNode:
-        token = self.peek()
-        if token.kind == TokenKind.Operator:
-            if token.value not in PREFIX_OPERATORS:
-                raise InvalidSyntax(
-                    token.value,
-                    "invalid unary operator",
-                    token.span
-                )
-
-            op_token = self.advance()
-            op = op_token.value
-            right = self.parse_unary()
-            span = op_token.span.to(right.span)
-
-            if isinstance(right, ast.NumberLiteral) and op in ("+", "-"):
-                return ast.NumberLiteral(-right.value if op == "-" else right.value, span=span)
-            return ast.UnaryOperation(op, right, span=span)
-        return self.parse_primary()
-
-    def parse_multiplicative(self) -> ast.ASTNode:
-        left = self.parse_unary()
-        while self.peek().kind == TokenKind.Operator and self.peek().value in ("*", "/", "%"):
-            op = self.advance().value
-            right = self.parse_unary()
-            left = ast.BinaryOperation(left, op, right, span=left.span.to(right.span))
-        return left
-
-    def parse_additive(self) -> ast.ASTNode:
-        left = self.parse_multiplicative()
-        while self.peek().kind == TokenKind.Operator and self.peek().value in ("+", "-"):
-            op = self.advance().value
-            right = self.parse_multiplicative()
-            left = ast.BinaryOperation(left, op, right, span=left.span.to(right.span))
-        return left
 
     def parse_let(self) -> ast.Let:
         type = "?"

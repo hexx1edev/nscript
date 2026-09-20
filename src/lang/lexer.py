@@ -106,6 +106,11 @@ class Lexer:
 
         if ident in defs.KEYWORDS:
             return Token(TokenKind.Keyword, ident, Span(start, self.pos)), None
+        elif ident in defs.BOOLEAN:
+            if ident == "true":
+                return Token(TokenKind.Boolean, True, Span(start, self.pos)), None
+            else:
+                return Token(TokenKind.Boolean, False, Span(start, self.pos)), None
         else:
             return Token(TokenKind.Identifier, ident, Span(start, self.pos)), None
 

@@ -31,6 +31,10 @@ class NumberLiteral(ASTNode):
     value: int
 
 @dataclass
+class BooleanLiteral(ASTNode):
+    value: bool
+
+@dataclass
 class Identifier(ASTNode):
     name: str
 
