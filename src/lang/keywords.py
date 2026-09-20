@@ -1,1 +1,0 @@
-KEYWORDS = ("fn", "return", "let", "const")

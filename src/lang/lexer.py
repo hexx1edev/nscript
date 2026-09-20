@@ -1,5 +1,5 @@
 from lang.token import Token, TokenKind
-from lang import keywords, operators
+from lang import defs
 from enum import Enum
 
 
@@ -97,7 +97,7 @@ class Lexer:
         while self.current().isalnum():
             ident += self.consume()
 
-        if ident in keywords.KEYWORDS:
+        if ident in defs.KEYWORDS:
             return Token(TokenKind.Keyword, ident), None
         else:
             return Token(TokenKind.Identifier, ident), None
@@ -116,7 +116,7 @@ class Lexer:
     def read_operator(self) -> tuple[Token | None, LexerError | None]:
         op = ""
 
-        if self.current() not in operators.BASE:
+        if self.current() not in defs.BASE:
             return (
                 None,
                 LexerError(
@@ -125,10 +125,10 @@ class Lexer:
                 )
             )
 
-        while self.current() in operators.BASE:
+        while self.current() in defs.BASE:
             op += self.consume()
 
-        if op not in operators.OPERATORS:
+        if op not in defs.OPERATORS:
             return (
                 None,
                 LexerError(
