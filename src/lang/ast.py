@@ -47,4 +47,5 @@ class Let(ASTNode):
 @dataclass
 class Assignment(ASTNode):
     source: ASTNode
+    op: str
     destination: Identifier

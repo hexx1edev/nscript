@@ -2,25 +2,6 @@ from lang import ast, defs
 from enum import Enum
 from lang.token import TokenKind, Token
 
-# binary operators by precedence, lowest to highest; every entry must be
-# a binary operator declared in defs
-BINARY_LEVELS = (
-    ("||",),
-    ("^^",),
-    ("&&",),
-    ("<", ">", "<=", ">=", "!="),
-    ("|",),
-    ("^",),
-    ("&",),
-    ("+", "-"),
-    ("*", "/", "%"),
-)
-PRECEDENCE = {
-    op: level
-    for level, ops in enumerate(BINARY_LEVELS, start=1)
-    for op in ops
-    if op in defs.GENERAL_OPERATORS + defs.CONDITION_OPERATORS
-}
 PREFIX_OPERATORS = ("+", "-") + defs.UNARY_OPERATORS
 
 
@@ -216,7 +197,7 @@ class Parser:
             case TokenKind.Identifier:
                 self.advance()
                 next = self.peek()
-                if next.kind == TokenKind.Operator and next.value == "=":
+                if next.kind == TokenKind.Operator:
                     self.rewind()
                     return self.parse_assignment()
 
@@ -234,7 +215,7 @@ class Parser:
         return ast.Return(expression)
 
     def parse_expression(self) -> ast.ASTNode:
-        return self.parse_binary(1)
+        return self.parse_additive()
 
     def parse_primary(self) -> ast.ASTNode:
         token = self.advance()
@@ -263,32 +244,25 @@ class Parser:
             op = self.advance().value
             right = self.parse_unary()
 
-            if op in ("+", "-") and isinstance(right, ast.NumberLiteral):
+            if isinstance(right, ast.NumberLiteral) and op in ("+", "-"):
                 return ast.NumberLiteral(-right.value if op == "-" else right.value)
             return ast.UnaryOperation(op, right)
         return self.parse_primary()
 
-    def parse_binary(self, min_prec: int) -> ast.ASTNode:
+    def parse_multiplicative(self) -> ast.ASTNode:
         left = self.parse_unary()
-
-        while self.pos < len(self.tokens):
-            token = self.peek()
-            if token.kind != TokenKind.Operator:
-                break
-
-            prec = PRECEDENCE.get(token.value)
-            if prec is None:
-                raise InvalidSyntax(
-                    token.value,
-                    "invalid binary operator in expression"
-                )
-            if prec < min_prec:
-                break
-
+        while self.peek().kind == TokenKind.Operator and self.peek().value in ("*", "/", "%"):
             op = self.advance().value
-            right = self.parse_binary(prec + 1)
+            right = self.parse_unary()
             left = ast.BinaryOperation(left, op, right)
+        return left
 
+    def parse_additive(self) -> ast.ASTNode:
+        left = self.parse_multiplicative()
+        while self.peek().kind == TokenKind.Operator and self.peek().value in ("+", "-"):
+            op = self.advance().value
+            right = self.parse_multiplicative()
+            left = ast.BinaryOperation(left, op, right)
         return left
 
     def parse_let(self) -> ast.Let:
@@ -327,7 +301,13 @@ class Parser:
 
     def parse_assignment(self) -> ast.Assignment:
         destination = ast.Identifier(self.expect(TokenKind.Identifier).value)
-        self.expect(TokenKind.Operator, "=")
+
+        op = self.expect(TokenKind.Operator).value
+        if op not in defs.ASSIGN_OPERATORS + ("=",):
+            raise InvalidSyntax(
+                op,
+                "expected assignment operator"
+            )
         source = self.parse_expression()
         self.expect(TokenKind.Semicolon)
-        return ast.Assignment(source, destination)
+        return ast.Assignment(source, op, destination)
