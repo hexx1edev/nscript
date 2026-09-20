@@ -71,6 +71,10 @@ class Parser:
         self.pos -= 1
         return token
 
+    def next(self) -> Token:
+        self.pos += 1
+        return self.peek()
+
     def expect(
         self,
         kind: TokenKind,
@@ -253,10 +257,17 @@ class Parser:
         return left
 
     def parse_let(self) -> ast.Let:
-        self.expect(TokenKind.Keyword, "let")
-        name = self.expect(TokenKind.Identifier, message="expected variable name").value
         type = "?"
         value = None
+        const = False
+
+        self.expect(TokenKind.Keyword, "let")
+
+        if self.peek().kind == TokenKind.Keyword and self.peek().value == "const":
+            const = True
+            self.advance()
+
+        name = self.expect(TokenKind.Identifier, message="expected variable name").value
 
         if self.peek().kind == TokenKind.Colon:
             self.advance()
@@ -277,7 +288,7 @@ class Parser:
 
         self.expect(TokenKind.Semicolon)
 
-        return ast.Let(name, type, value)
+        return ast.Let(name, type, value, const)
 
     def parse_assignment(self) -> ast.Assignment:
         destination = ast.Identifier(self.expect(TokenKind.Identifier).value)

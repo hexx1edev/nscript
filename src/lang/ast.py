@@ -42,6 +42,7 @@ class Let(ASTNode):
     name: str
     type: str
     value: ASTNode
+    const: bool
 
 @dataclass
 class Assignment(ASTNode):
