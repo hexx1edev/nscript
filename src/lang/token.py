@@ -11,6 +11,7 @@ class TokenKind(Enum):
     RBrace = 7
     Number = 8
     Semicolon = 9
+    Colon = 10
 
 class Token:
     kind: TokenKind
@@ -40,6 +41,8 @@ class Token:
                 return f"Number({self.value})"
             case TokenKind.Semicolon:
                 return "Semicolon"
+            case TokenKind.Colon:
+                return "Colon"
 
     def name(self) -> str:
         match self.kind:
@@ -61,3 +64,5 @@ class Token:
                 return "number"
             case TokenKind.Semicolon:
                 return "semicolon"
+            case TokenKind.Colon:
+                return "colon"

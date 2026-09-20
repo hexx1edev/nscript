@@ -1,4 +1,4 @@
-from lang import token as tok
+from lang.token import Token, TokenKind
 from lang import keywords, operators
 from enum import Enum
 
@@ -47,7 +47,7 @@ class Lexer:
         self.pos += 1
         return current
 
-    def tokenize(self) -> tuple[list[tok.Token], LexerError | None]:
+    def tokenize(self) -> tuple[list[Token], LexerError | None]:
         tokens = []
 
         while self.pos < len(self.source):
@@ -64,19 +64,22 @@ class Lexer:
                     return tokens, error
                 tokens.append(token)
             elif current == "(":
-                tokens.append(tok.Token(tok.TokenKind.LParen, "("))
+                tokens.append(Token(TokenKind.LParen, "("))
                 self.next()
             elif current == ")":
-                tokens.append(tok.Token(tok.TokenKind.RParen, ")"))
+                tokens.append(Token(TokenKind.RParen, ")"))
                 self.next()
             elif current == "{":
-                tokens.append(tok.Token(tok.TokenKind.LBrace, "{"))
+                tokens.append(Token(TokenKind.LBrace, "{"))
                 self.next()
             elif current == "}":
-                tokens.append(tok.Token(tok.TokenKind.RBrace, "}"))
+                tokens.append(Token(TokenKind.RBrace, "}"))
                 self.next()
             elif current == ";":
-                tokens.append(tok.Token(tok.TokenKind.Semicolon, ";"))
+                tokens.append(Token(TokenKind.Semicolon, ";"))
+                self.next()
+            elif current == ":":
+                tokens.append(Token(TokenKind.Colon, ":"))
                 self.next()
             elif current in ("\n", "\r\n", " ", "\t"):
                 self.next()
@@ -88,18 +91,18 @@ class Lexer:
 
         return tokens, None
 
-    def read_identifier(self) -> tuple[tok.Token | None, LexerError | None]:
+    def read_identifier(self) -> tuple[Token | None, LexerError | None]:
         ident = ""
 
         while self.current().isalnum():
             ident += self.consume()
 
         if ident in keywords.KEYWORDS:
-            return tok.Token(tok.TokenKind.Keyword, ident), None
+            return Token(TokenKind.Keyword, ident), None
         else:
-            return tok.Token(tok.TokenKind.Identifier, ident), None
+            return Token(TokenKind.Identifier, ident), None
 
-    def read_number(self) -> tuple[tok.Token | None, LexerError | None]:
+    def read_number(self) -> tuple[Token | None, LexerError | None]:
         num = ""
 
         while self.current().isnumeric():
@@ -108,9 +111,9 @@ class Lexer:
         if self.current().isalpha():
             return None, LexerError(LexerErrorKind.InvalidNumber, self.current())
 
-        return tok.Token(tok.TokenKind.Number, int(num)), None
+        return Token(TokenKind.Number, int(num)), None
 
-    def read_operator(self) -> tuple[tok.Token | None, LexerError | None]:
+    def read_operator(self) -> tuple[Token | None, LexerError | None]:
         op = ""
 
         if self.current() not in operators.BASE:
@@ -134,4 +137,4 @@ class Lexer:
                 )
             )
 
-        return tok.Token(tok.TokenKind.Operator, op), None
+        return Token(TokenKind.Operator, op), None

@@ -36,3 +36,9 @@ class BinaryOperation(ASTNode):
 class UnaryOperation(ASTNode):
     operator: str
     right: ASTNode
+
+@dataclass
+class Let(ASTNode):
+    name: str
+    type: str
+    value: ASTNode

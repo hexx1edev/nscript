@@ -78,11 +78,11 @@ class Parser:
         if token.kind != kind or (
             value is not None and token.value != value
         ):
-            suffix = ""
-            if value is not None:
-                suffix = f" {token.value}"
+            expected = value if value is not None else Token(
+                kind, None
+            ).name()
 
-            msg = f"expected {token.name()}{suffix}"
+            msg = f"expected {expected}"
 
             if message is not None:
                 msg = message
@@ -177,8 +177,11 @@ class Parser:
 
         match token.kind:
             case TokenKind.Keyword:
-                if token.value == "return":
-                    return self.parse_return()
+                match token.value:
+                    case "return":
+                        return self.parse_return()
+                    case "let":
+                        return self.parse_let()
 
         raise InvalidSyntax(
             token.value,
@@ -230,10 +233,37 @@ class Parser:
             left = ast.BinaryOperation(left, op, right)
         return left
 
-    def parse_additive(self):
+    def parse_additive(self) -> ast.ASTNode:
         left = self.parse_multiplicative()
         while self.peek().kind == TokenKind.Operator and self.peek().value in ("+", "-"):
             op = self.advance().value
             right = self.parse_multiplicative()
             left = ast.BinaryOperation(left, op, right)
         return left
+
+    def parse_let(self) -> ast.Let:
+        self.expect(TokenKind.Keyword, "let")
+        name = self.expect(TokenKind.Identifier, message="expected variable name").value
+        type = "?"
+        value = None
+
+        if self.peek().kind == TokenKind.Colon:
+            self.advance()
+            type = self.expect(
+                TokenKind.Identifier,
+                message="expected type"
+            ).value
+
+        token = self.peek()
+        if token.kind == TokenKind.Operator and token.value == "=":
+            self.advance()
+            value = self.parse_expression()
+        elif type == "?":
+            raise InvalidSyntax(
+                token.value,
+                "expected type annotation or initializer"
+            )
+
+        self.expect(TokenKind.Semicolon)
+
+        return ast.Let(name, type, value)
