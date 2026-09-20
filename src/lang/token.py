@@ -13,6 +13,7 @@ class TokenKind(Enum):
     Number = 8
     Semicolon = 9
     Colon = 10
+    Comma = 11
 
 class Token:
     kind: TokenKind
@@ -46,6 +47,8 @@ class Token:
                 return "Semicolon"
             case TokenKind.Colon:
                 return "Colon"
+            case TokenKind.Comma:
+                return "Comma"
 
     def name(self) -> str:
         match self.kind:
@@ -69,3 +72,5 @@ class Token:
                 return "semicolon"
             case TokenKind.Colon:
                 return "colon"
+            case TokenKind.Comma:
+                return "comma"

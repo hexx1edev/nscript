@@ -1,7 +1,7 @@
 from colorama import Style, Fore
 from lang.span import Span
 
-CONTEXT_LINES = 2
+CONTEXT_LINES = 3
 
 
 def render(source: str, span: Span, message: str, path: str = "") -> str:

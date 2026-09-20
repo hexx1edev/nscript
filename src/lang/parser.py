@@ -32,7 +32,7 @@ class ParserError(Exception):
     def __str__(self) -> str:
         match self.kind:
             case ParserErrorKind.InvalidSyntax:
-                return f"invalid syntax: {self.value}, {self.message}"
+                return f"invalid syntax: `{self.value}`. {self.message}"
             case ParserErrorKind.UnexpectedEOF:
                 return "unexpected EOF"
 
@@ -63,11 +63,13 @@ class Parser:
         self.pos = 0
         self.tokens = tokens
 
-    def peek(self) -> Token:
-        if self.pos >= len(self.tokens):
+    def peek(self, ahead: bool = False) -> Token:
+        pos = self.pos + 1 if ahead else self.pos
+
+        if pos >= len(self.tokens):
             raise UnexpectedEOF(self.eof_span())
 
-        return self.tokens[self.pos]
+        return self.tokens[pos]
 
     def eof_span(self) -> Span:
         if not self.tokens:
@@ -136,7 +138,7 @@ class Parser:
         return program
 
     def parse_function(self) -> ast.Function:
-        func = ast.Function("", "?", [])
+        func = ast.Function("", "?", [], [])
 
         start = self.expect(TokenKind.Keyword, "fn").span
 
@@ -148,6 +150,9 @@ class Parser:
         func.name = name.value
 
         self.expect(TokenKind.LParen)
+
+        func.args = self.parse_function_args()
+
         self.expect(TokenKind.RParen)
 
         token = self.peek()
@@ -184,6 +189,37 @@ class Parser:
 
         return func
 
+    def parse_function_args(self) -> list[ast.Argument]:
+        args = []
+
+        if self.peek().kind == TokenKind.RParen:
+            return args
+
+        while True:
+            name = self.expect(
+                TokenKind.Identifier,
+                message="expected argument name"
+            )
+            self.expect(TokenKind.Colon, message="expected type annotation")
+            type = self.expect(TokenKind.Identifier, message="expected type")
+            args.append(
+                ast.Argument(name.value, type.value, span=name.span.to(type.span))
+            )
+
+            token = self.peek()
+            if token.kind == TokenKind.Comma:
+                self.advance()
+            elif token.kind == TokenKind.RParen:
+                break
+            else:
+                raise InvalidSyntax(
+                    token.value,
+                    "expected comma or right parenthesis",
+                    token.span
+                )
+
+        return args
+
     def parse_block(self) -> list[ast.ASTNode]:
         block = []
 
@@ -211,11 +247,16 @@ class Parser:
                     case "let":
                         return self.parse_let()
             case TokenKind.Identifier:
-                self.advance()
-                next = self.peek()
-                if next.kind == TokenKind.Operator:
-                    self.rewind()
-                    return self.parse_assignment()
+                next = self.peek(True)
+                match next.kind:
+                    case TokenKind.Operator:
+                        return self.parse_assignment()
+                    case TokenKind.LParen:
+                        call = self.parse_func_call()
+                        end = self.expect(TokenKind.Semicolon).span
+                        call.span = call.span.to(end)
+                        return call
+
 
         raise InvalidSyntax(
             token.value,
@@ -235,7 +276,11 @@ class Parser:
         return self.parse_additive()
 
     def parse_primary(self) -> ast.ASTNode:
-        token = self.advance()
+        token = self.peek()
+        if token.kind == TokenKind.Identifier and self.peek(True).kind == TokenKind.LParen:
+            return self.parse_func_call()
+
+        self.advance()
         if token.kind == TokenKind.Number:
             return ast.NumberLiteral(token.value, span=token.span)
         if token.kind == TokenKind.Identifier:
@@ -337,3 +382,30 @@ class Parser:
         source = self.parse_expression()
         end = self.expect(TokenKind.Semicolon).span
         return ast.Assignment(source, op, destination, span=ident.span.to(end))
+
+    def parse_func_call(self) -> ast.FuncCall:
+        name = self.expect(TokenKind.Identifier, message="expected function name")
+        call = ast.FuncCall(name.value, [])
+
+        self.expect(TokenKind.LParen)
+
+        if self.peek().kind != TokenKind.RParen:
+            while True:
+                call.args.append(self.parse_expression())
+
+                token = self.peek()
+                if token.kind == TokenKind.Comma:
+                    self.advance()
+                elif token.kind == TokenKind.RParen:
+                    break
+                else:
+                    raise InvalidSyntax(
+                        token.value,
+                        "expected comma or right parenthesis",
+                        token.span
+                    )
+
+        end = self.expect(TokenKind.RParen).span
+        call.span = name.span.to(end)
+
+        return call

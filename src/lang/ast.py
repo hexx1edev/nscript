@@ -11,9 +11,15 @@ class Program(ASTNode):
     functions: list["Function"]
 
 @dataclass
+class Argument(ASTNode):
+    name: str
+    type: str
+
+@dataclass
 class Function(ASTNode):
     name: str
     return_type: str
+    args: list[Argument]
     body: list[ASTNode]
 
 @dataclass
@@ -51,3 +57,8 @@ class Assignment(ASTNode):
     source: ASTNode
     op: str
     destination: Identifier
+
+@dataclass
+class FuncCall(ASTNode):
+    name: str
+    args: list[ASTNode]

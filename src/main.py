@@ -4,6 +4,7 @@ from util.diagnostic import render
 from colorama import just_fix_windows_console
 import lang.lexer
 import lang.parser
+import pprint
 
 def main() -> int:
     just_fix_windows_console()
@@ -41,7 +42,7 @@ def main() -> int:
         print(render(source, error.span, str(error), argv[1]))
         return 1
 
-    print(program)
+    pprint.pprint(program)
 
     return 0
 

@@ -84,6 +84,9 @@ class Lexer:
             elif current == ":":
                 tokens.append(Token(TokenKind.Colon, ":", Span(self.pos, self.pos + 1)))
                 self.next()
+            elif current == ",":
+                tokens.append(Token(TokenKind.Comma, ",", Span(self.pos, self.pos + 1)))
+                self.next()
             elif current in ("\n", "\r\n", " ", "\t"):
                 self.next()
             else:
