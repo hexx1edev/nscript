@@ -258,6 +258,8 @@ class Parser:
                         return self.parse_return()
                     case "let":
                         return self.parse_let()
+                    case "if":
+                        return self.parse_if()
             case TokenKind.Identifier:
                 next = self.peek(True)
                 match next.kind:
@@ -404,3 +406,54 @@ class Parser:
         call.span = name.span.to(end)
 
         return call
+
+    def parse_if(self) -> ast.If:
+        start = self.expect(TokenKind.Keyword, "if")
+        condition = self.parse_expression()
+        block = self.parse_block()
+        alternatives = []
+        final = []
+
+        has_else = False
+
+        while self.pos < len(self.tokens):
+            token = self.peek()
+            if token.kind != TokenKind.Keyword or token.value != "else":
+                break
+
+            after = self.peek(True)
+            if after.kind == TokenKind.Keyword and after.value == "if":
+                alternatives.append(self.parse_else_if())
+            elif after.kind == TokenKind.LBrace:
+                if has_else:
+                    raise InvalidSyntax(
+                        token.value,
+                        "duplicate else block",
+                        token.span
+                    )
+                has_else = True
+                final = self.parse_else()
+            else:
+                raise InvalidSyntax(
+                    after.value,
+                    "expected either else or else if block",
+                    after.span
+                )
+
+        return ast.If(
+            condition, block, alternatives, final,
+            span=start.span.to(self.prev_span())
+        )
+
+    def parse_else_if(self) -> ast.ElseIf:
+        start = self.expect(TokenKind.Keyword, "else")
+        end = self.expect(TokenKind.Keyword, "if")
+        condition = self.parse_expression()
+        block = self.parse_block()
+
+        return ast.ElseIf(condition, block, span=start.span.to(end.span))
+
+    def parse_else(self) -> list[ast.ASTNode]:
+        self.expect(TokenKind.Keyword, "else")
+        block = self.parse_block()
+        return block

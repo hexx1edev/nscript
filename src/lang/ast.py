@@ -66,3 +66,15 @@ class Assignment(ASTNode):
 class FuncCall(ASTNode):
     name: str
     args: list[ASTNode]
+
+@dataclass
+class ElseIf(ASTNode):
+    condition: ASTNode
+    body: list[ASTNode]
+
+@dataclass
+class If(ASTNode):
+    condition: ASTNode
+    body: list[ASTNode]
+    alternatives: list[ElseIf]
+    final: list[ASTNode]

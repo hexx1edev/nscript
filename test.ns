@@ -1,7 +1,10 @@
 fn main() -> i32 {
     let a = true;
-}
+    if a {
+        let b = false;
+    } else if a {
 
-fn add(a: i32, b: i32) -> i32 {
-    return a + b;
+    } else {
+        a += b;
+    }
 }
