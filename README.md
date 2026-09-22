@@ -3,7 +3,7 @@
 NScript is a simple C-like compiled programming language, that was designed to be a better and mixed version of C, C++ and Rust while keeping simplicity and beginner-friendly syntax.
 
 The language's compiler is currently written in Python(because I want to finish it ASAP), but after first release I'll start working on rewriting it to itself.  
-It uses LLVM(not ready yet) as a backend.
+It uses LLVM as a compilation backend.
 
 ## Building
 
@@ -11,9 +11,9 @@ Install `python >=3.12, uv`, run `uv sync`.
 
 ## Usage
 
-Run `uv run nscript <path/to/file.ns>`, compiler will parse the file and generate an AST. Later, I'll implement actual compilation with LLVM.
+Run `uv run nscript <path/to/file.ns> -o <out.o>` to compile a program into object file. You have to link it before running it.
 
-You can run some examples from `examples` directory to see what AST comes out.
+You can compile and run some examples from `examples` directory and see the result code, coming out from the executable.
 
 ## Features
 
