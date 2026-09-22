@@ -5,7 +5,6 @@ import lang.lexer
 import lang.parser
 import lang.semantic
 from backend import codegen, compiler
-import pprint
 import argparse
 
 def build_parser() -> argparse.ArgumentParser:

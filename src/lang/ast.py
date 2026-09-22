@@ -30,25 +30,30 @@ class Return(ASTNode):
 @dataclass
 class NumberLiteral(ASTNode):
     value: int
+    type: types.Type | None = field(default=None, kw_only=True, compare=False, repr=False)
 
 @dataclass
 class BooleanLiteral(ASTNode):
     value: bool
+    type: types.Type | None = field(default=None, kw_only=True, compare=False, repr=False)
 
 @dataclass
 class Identifier(ASTNode):
     name: str
+    type: types.Type | None = field(default=None, kw_only=True, compare=False, repr=False)
 
 @dataclass
 class BinaryOperation(ASTNode):
     left: ASTNode
     operator: str
     right: ASTNode
+    type: types.Type | None = field(default=None, kw_only=True, compare=False, repr=False)
 
 @dataclass
 class UnaryOperation(ASTNode):
     operator: str
     right: ASTNode
+    type: types.Type | None = field(default=None, kw_only=True, compare=False, repr=False)
 
 @dataclass
 class Let(ASTNode):
@@ -67,6 +72,7 @@ class Assignment(ASTNode):
 class FuncCall(ASTNode):
     name: "Identifier"
     args: list[ASTNode]
+    type: types.Type | None = field(default=None, kw_only=True, compare=False, repr=False)
 
 @dataclass
 class ElseIf(ASTNode):

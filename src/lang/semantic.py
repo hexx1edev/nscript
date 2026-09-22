@@ -162,6 +162,8 @@ class Analyzer:
         elif symbol.const:
             self.error(node.destination, f"`{symbol.name}` is a constant")
 
+        node.destination.type = symbol.type
+
         if node.op == "=":
             self.coerce(node.source, value, symbol.type)
         else:
@@ -171,6 +173,11 @@ class Analyzer:
                 self.error(node.destination, f"`{value}` is not numeric or numeric-compatible")
 
     def check_expr(self, node: ast.ASTNode) -> types.Type:
+        result = self.check_expr_inner(node)
+        node.type = result
+        return result
+
+    def check_expr_inner(self, node: ast.ASTNode) -> types.Type:
         match node:
             case ast.NumberLiteral():
                 return types.I32
