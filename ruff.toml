@@ -13,6 +13,7 @@ select = [
 ignore = [
     "E501", # line too long — formatter handles this
     "I001", # I hate this
+    "B905", # makes no sense
 ]
 
 [format]

@@ -4,6 +4,7 @@ from util.diagnostic import render
 from colorama import just_fix_windows_console
 import lang.lexer
 import lang.parser
+import lang.semantic
 import pprint
 
 def main() -> int:
@@ -16,8 +17,8 @@ def main() -> int:
     source = ""
 
     try:
-        file = open(argv[1])
-        source = file.read()
+        with open(argv[1], encoding="utf-8") as file:
+            source = file.read()
     except FileNotFoundError:
         eprint(f"failed to open `{argv[0]}`: file not found")
         return 1
@@ -40,6 +41,13 @@ def main() -> int:
     program, error = parser.parse()
     if error is not None:
         print(render(source, error.span, str(error), argv[1]))
+        return 1
+
+    errors = lang.semantic.Analyzer(program).analyze()
+    for error in errors:
+        print(render(source, error.span, str(error), argv[1]))
+    if errors:
+        eprint(f"aborting due to {len(errors)} error(s)")
         return 1
 
     pprint.pprint(program)

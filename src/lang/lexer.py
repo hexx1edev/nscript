@@ -36,72 +36,87 @@ class Lexer:
         self.pos = 0
         self.source = source
     
-    def current(self) -> str:
-        if self.pos >= len(self.source):
+    def peek(self, ahead: bool = False) -> str:
+        pos = self.pos
+        if ahead:
+            pos += 1
+        
+        if pos >= len(self.source):
             return ""
-        return self.source[self.pos]
+        return self.source[pos]
 
     def next(self) -> str:
         self.pos += 1
-        return self.current()
+        return self.peek()
 
     def consume(self) -> str:
-        current = self.current()
+        peek = self.peek()
         self.pos += 1
-        return current
+        return peek
 
     def tokenize(self) -> tuple[list[Token], LexerError | None]:
         tokens = []
 
         while self.pos < len(self.source):
-            current = self.current()
+            peek = self.peek()
 
-            if current.isalpha():
+            if peek.isalpha():
                 token, error = self.read_identifier()
                 if error is not None:
                     return tokens, error
                 tokens.append(token)
-            elif current.isnumeric():
+            elif peek.isnumeric():
                 token, error = self.read_number()
                 if error is not None:
                     return tokens, error
                 tokens.append(token)
-            elif current == "(":
+            elif peek == "(":
                 tokens.append(Token(TokenKind.LParen, "(", Span(self.pos, self.pos + 1)))
                 self.next()
-            elif current == ")":
+            elif peek == ")":
                 tokens.append(Token(TokenKind.RParen, ")", Span(self.pos, self.pos + 1)))
                 self.next()
-            elif current == "{":
+            elif peek == "{":
                 tokens.append(Token(TokenKind.LBrace, "{", Span(self.pos, self.pos + 1)))
                 self.next()
-            elif current == "}":
+            elif peek == "}":
                 tokens.append(Token(TokenKind.RBrace, "}", Span(self.pos, self.pos + 1)))
                 self.next()
-            elif current == ";":
+            elif peek == ";":
                 tokens.append(Token(TokenKind.Semicolon, ";", Span(self.pos, self.pos + 1)))
                 self.next()
-            elif current == ":":
+            elif peek == ":":
                 tokens.append(Token(TokenKind.Colon, ":", Span(self.pos, self.pos + 1)))
                 self.next()
-            elif current == ",":
+            elif peek == ",":
                 tokens.append(Token(TokenKind.Comma, ",", Span(self.pos, self.pos + 1)))
                 self.next()
-            elif current in ("\n", "\r\n", " ", "\t"):
+            elif peek in ("\n", "\r\n", " ", "\t"):
                 self.next()
             else:
                 token, error = self.read_operator()
                 if error is not None:
                     return tokens, error
-                tokens.append(token)
+                if token is not None:
+                    tokens.append(token)
 
         return tokens, None
+
+    def skip_comment(self):
+        while True:
+            if self.pos >= len(self.source):
+                break
+            peek = self.peek()
+            if peek not in ("\n", "\r\n"):
+                self.next()
+            else:
+                break
 
     def read_identifier(self) -> tuple[Token | None, LexerError | None]:
         start = self.pos
         ident = ""
 
-        while self.current().isalnum():
+        while self.peek().isalnum() or self.peek() == "_":
             ident += self.consume()
 
         if ident in defs.KEYWORDS:
@@ -118,13 +133,13 @@ class Lexer:
         start = self.pos
         num = ""
 
-        while self.current().isnumeric():
+        while self.peek().isnumeric():
             num += self.consume()
 
-        if self.current().isalpha():
+        if self.peek().isalpha():
             return None, LexerError(
                 LexerErrorKind.InvalidNumber,
-                self.current(),
+                self.peek(),
                 Span(start, self.pos + 1)
             )
 
@@ -134,18 +149,22 @@ class Lexer:
         start = self.pos
         op = ""
 
-        if self.current() not in defs.BASE:
+        if self.peek() not in defs.BASE:
             return (
                 None,
                 LexerError(
                     LexerErrorKind.UnknownSymbol,
-                    self.current(),
+                    self.peek(),
                     Span(start, start + 1)
                 )
             )
 
-        while self.current() in defs.BASE:
+        while self.peek() in defs.BASE:
             op += self.consume()
+
+        if op == "//":
+            self.skip_comment()
+            return None, None
 
         if op not in defs.OPERATORS:
             return (

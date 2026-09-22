@@ -281,7 +281,9 @@ class Parser:
     def parse_return(self) -> ast.Return:
         start = self.expect(TokenKind.Keyword, "return").span
 
-        expression = self.parse_expression()
+        expression = None
+        if self.peek().kind != TokenKind.Semicolon:
+            expression = self.parse_expression()
         end = self.expect(TokenKind.Semicolon).span
 
         return ast.Return(expression, span=start.to(end))
@@ -381,8 +383,9 @@ class Parser:
         return ast.Assignment(source, op, destination, span=ident.span.to(end))
 
     def parse_func_call(self) -> ast.FuncCall:
-        name = self.expect(TokenKind.Identifier, message="expected function name")
-        call = ast.FuncCall(name.value, [])
+        token = self.expect(TokenKind.Identifier, message="expected function name")
+        name = ast.Identifier(token.value, span=token.span)
+        call = ast.FuncCall(name, [])
 
         self.expect(TokenKind.LParen)
 
@@ -411,8 +414,8 @@ class Parser:
         start = self.expect(TokenKind.Keyword, "if")
         condition = self.parse_expression()
         block = self.parse_block()
-        alternatives = []
-        final = []
+        branches = []
+        fallback = []
 
         has_else = False
 
@@ -423,7 +426,7 @@ class Parser:
 
             after = self.peek(True)
             if after.kind == TokenKind.Keyword and after.value == "if":
-                alternatives.append(self.parse_else_if())
+                branches.append(self.parse_else_if())
             elif after.kind == TokenKind.LBrace:
                 if has_else:
                     raise InvalidSyntax(
@@ -432,7 +435,7 @@ class Parser:
                         token.span
                     )
                 has_else = True
-                final = self.parse_else()
+                fallback = self.parse_else()
             else:
                 raise InvalidSyntax(
                     after.value,
@@ -441,7 +444,7 @@ class Parser:
                 )
 
         return ast.If(
-            condition, block, alternatives, final,
+            condition, block, branches, fallback,
             span=start.span.to(self.prev_span())
         )
 

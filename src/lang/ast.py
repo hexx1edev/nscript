@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from lang.span import Span
+from lang import types
 
 
 @dataclass
@@ -13,18 +14,18 @@ class Program(ASTNode):
 @dataclass
 class Argument(ASTNode):
     name: str
-    type: str
+    type: str | types.Type
 
 @dataclass
 class Function(ASTNode):
     name: str
-    return_type: str
+    return_type: str | types.Type
     args: list[Argument]
     body: list[ASTNode]
 
 @dataclass
 class Return(ASTNode):
-    value: ASTNode
+    value: ASTNode | None
 
 @dataclass
 class NumberLiteral(ASTNode):
@@ -52,7 +53,7 @@ class UnaryOperation(ASTNode):
 @dataclass
 class Let(ASTNode):
     name: str
-    type: str
+    type: str | types.Type
     value: ASTNode
     const: bool
 
@@ -64,7 +65,7 @@ class Assignment(ASTNode):
 
 @dataclass
 class FuncCall(ASTNode):
-    name: str
+    name: "Identifier"
     args: list[ASTNode]
 
 @dataclass
@@ -76,5 +77,5 @@ class ElseIf(ASTNode):
 class If(ASTNode):
     condition: ASTNode
     body: list[ASTNode]
-    alternatives: list[ElseIf]
-    final: list[ASTNode]
+    branches: list[ElseIf]
+    fallback: list[ASTNode]
