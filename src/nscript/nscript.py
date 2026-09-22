@@ -7,11 +7,11 @@ import lang.parser
 import lang.semantic
 import pprint
 
-def main() -> int:
+def run() -> int:
     just_fix_windows_console()
 
     if len(argv) != 2:
-        eprint(f"usage:{argv[0]} <file>")
+        eprint(f"usage: {argv[0]} <file>")
         return 1
 
     source = ""
@@ -54,5 +54,3 @@ def main() -> int:
 
     return 0
 
-if __name__ == "__main__":
-    exit(main())

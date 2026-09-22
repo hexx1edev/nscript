@@ -1,1 +1,15 @@
+# Virtual environment
+.venv/
+
+# Python cache
 *__pycache__*
+*.pyc
+*.pyo
+
+# uv cache (if ever local to project, usually isn't)
+.uv-cache/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
