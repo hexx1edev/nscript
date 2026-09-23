@@ -149,8 +149,25 @@ class Parser:
 
         return program
 
+    def parse_type(self) -> ast.Type:
+        start = self.peek()
+        const = False
+        pointer = False
+
+        if self.peek().kind == TokenKind.Keyword and self.peek().value == "const":
+            const = True
+            self.advance()
+
+        if self.peek().kind == TokenKind.Operator and self.peek().value == "*":
+            pointer = True
+            self.advance()
+
+        type_token = self.expect(TokenKind.Identifier, message="expected type")
+
+        return ast.Type(type_token.value, const, pointer, span=start.span.to(type_token.span))
+
     def parse_function(self) -> ast.Function:
-        func = ast.Function("", "?", [], [])
+        func = ast.Function("", None, [], [])
 
         start = self.expect(TokenKind.Keyword, "fn").span
 
@@ -172,13 +189,7 @@ class Parser:
         match token.kind:
             case TokenKind.Operator:
                 self.expect(TokenKind.Operator, "->")
-
-                ret_type = self.expect(
-                    TokenKind.Identifier,
-                    message="expected return type"
-                )
-
-                func.return_type = ret_type.value
+                func.return_type = self.parse_type()
 
             case TokenKind.LBrace:
                 pass
@@ -213,9 +224,9 @@ class Parser:
                 message="expected argument name"
             )
             self.expect(TokenKind.Colon, message="expected type annotation")
-            type = self.expect(TokenKind.Identifier, message="expected type")
+            type = self.parse_type()
             args.append(
-                ast.Argument(name.value, type.value, span=name.span.to(type.span))
+                ast.Argument(name.value, type, span=name.span.to(type.span))
             )
 
             token = self.peek()
@@ -280,6 +291,9 @@ class Parser:
                         end = self.expect(TokenKind.Semicolon).span
                         call.span = call.span.to(end)
                         return call
+            case TokenKind.Operator:
+                if token.value == "*" and self.peek(True).kind == TokenKind.Identifier:
+                    return self.parse_assignment()
 
 
         raise InvalidSyntax(
@@ -287,6 +301,11 @@ class Parser:
             "invalid statement",
             token.span
         )
+
+    def parse_dereference(self) -> ast.Dereference:
+        start = self.expect(TokenKind.Operator, "*")
+        val = self.expect(TokenKind.Identifier)
+        return ast.Dereference(ast.Identifier(val.value, span=val.span), span=start.span.to(val.span))
 
     def parse_return(self) -> ast.Return:
         start = self.expect(TokenKind.Keyword, "return").span
@@ -329,6 +348,13 @@ class Parser:
                 self.rewind()
                 return self.parse_func_call()
             return ast.Identifier(token.value, span=token.span)
+        elif token.kind == TokenKind.Operator:
+            if token.value == "*" and self.peek().kind == TokenKind.Identifier:
+                self.rewind()
+                return self.parse_dereference()
+            elif token.value == "&" and self.peek().kind == TokenKind.Identifier:
+                ident = self.advance()
+                return ast.Pointer(ident.value, span = token.span.to(ident.span))
         elif token.kind == TokenKind.LParen:
             node = self.parse_expression(0)
             self.expect(TokenKind.RParen)
@@ -342,30 +368,22 @@ class Parser:
         )
 
     def parse_let(self) -> ast.Let:
-        type = "?"
+        type = None
         value = None
-        const = False
 
         start = self.expect(TokenKind.Keyword, "let").span
-
-        if self.peek().kind == TokenKind.Keyword and self.peek().value == "const":
-            const = True
-            self.advance()
 
         name = self.expect(TokenKind.Identifier, message="expected variable name").value
 
         if self.peek().kind == TokenKind.Colon:
             self.advance()
-            type = self.expect(
-                TokenKind.Identifier,
-                message="expected type"
-            ).value
+            type = self.parse_type()
 
         token = self.peek()
         if token.kind == TokenKind.Operator and token.value == "=":
             self.advance()
             value = self.parse_expression()
-        elif type == "?":
+        elif type is None:
             raise InvalidSyntax(
                 token.value,
                 "expected type annotation or initializer",
@@ -374,11 +392,17 @@ class Parser:
 
         end = self.expect(TokenKind.Semicolon).span
 
-        return ast.Let(name, type, value, const, span=start.to(end))
+        return ast.Let(name, type, value, span=start.to(end))
 
     def parse_assignment(self) -> ast.Assignment:
-        ident = self.expect(TokenKind.Identifier)
-        destination = ast.Identifier(ident.value, span=ident.span)
+        destination = None
+
+        token = self.peek()
+        if token.kind == TokenKind.Operator and token.value == "*":
+            destination = self.parse_dereference()
+        else:
+            ident = self.expect(TokenKind.Identifier)
+            destination = ast.Identifier(ident.value, span=ident.span)
 
         op_token = self.expect(TokenKind.Operator)
         op = op_token.value
@@ -390,7 +414,7 @@ class Parser:
             )
         source = self.parse_expression()
         end = self.expect(TokenKind.Semicolon).span
-        return ast.Assignment(source, op, destination, span=ident.span.to(end))
+        return ast.Assignment(source, op, destination, span=destination.span.to(end))
 
     def parse_func_call(self) -> ast.FuncCall:
         token = self.expect(TokenKind.Identifier, message="expected function name")

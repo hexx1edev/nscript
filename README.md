@@ -36,18 +36,20 @@ These are language things:
 - [x] Boolean type
 - [x] If->else if->else statements
 - [x] While loops
-- [ ] For loops
-- [ ] String pointers
-- [ ] Raw pointers
+- [x] Raw pointers
+- [ ] String views
 - [ ] References
+- [ ] Floats
 - [ ] Structs
 - [ ] Iterators
+- [ ] For loops
 - [ ] Struct methods
 - [ ] Interfaces
 - [ ] Generics
 - [ ] Decorators
 - [ ] Modules
 - [ ] Standart library
+- [ ] Self-hosted
 
 ## License
 

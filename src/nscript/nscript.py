@@ -7,6 +7,7 @@ import lang.semantic
 from backend import codegen, compiler
 import argparse
 import pprint
+import os
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nscript")
@@ -14,6 +15,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-o", "--output", default="a.out", help="output file path")
     parser.add_argument("-ast", "--export-ast", help="output file path", action="store_true")
     return parser
+
+def program_name(source: str) -> str:
+    return os.path.splitext(os.path.basename(source))[0]
 
 def run() -> int:
     just_fix_windows_console()
@@ -59,11 +63,12 @@ def run() -> int:
 
     if args.export_ast:
         pprint.pprint(program)
-    else:
-        generator = codegen.IRGenerator(program, "prog")
-        module = generator.generate()
-    
-        compiler.compile_to_object(module, args.output)
+        return 0
+
+    generator = codegen.IRGenerator(program, program_name(args.source))
+    module = generator.generate()
+
+    compiler.compile_to_object(module, args.output)
 
     return 0
 

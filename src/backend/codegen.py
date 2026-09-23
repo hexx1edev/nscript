@@ -1,21 +1,44 @@
+from dataclasses import replace
 from llvmlite import ir
 from lang import ast, types
 
 
-TYPE_MAP: dict[types.Type, ir.Type] = {
-    types.I8: ir.IntType(8),   types.U8:  ir.IntType(8),
-    types.I16: ir.IntType(16), types.U16: ir.IntType(16),
-    types.I32: ir.IntType(32), types.U32: ir.IntType(32),
-    types.I64: ir.IntType(64), types.U64: ir.IntType(64),
-    types.BOOL: ir.IntType(1),
-    types.VOID: ir.VoidType(),
+SCALAR_TYPES: dict[str, ir.Type] = {
+    "i8": ir.IntType(8),   "u8":  ir.IntType(8),
+    "i16": ir.IntType(16), "u16": ir.IntType(16),
+    "i32": ir.IntType(32), "u32": ir.IntType(32),
+    "i64": ir.IntType(64), "u64": ir.IntType(64),
+    "bool": ir.IntType(1),
+    "void": ir.VoidType(),
 }
 
-SIGNED = {types.I8, types.I16, types.I32, types.I64}
+SIGNED_NAMES = {"i8", "i16", "i32", "i64"}
 
 ARITH_OPS = {"+", "-", "*", "/", "%", "|", "&", "^"}
 COMPARE_OPS = {"<", ">", "<=", ">=", "==", "!="}
 LOGICAL_OPS = {"&&", "||", "^^"}
+
+
+def llvm_type(t: types.Type) -> ir.Type:
+    base = SCALAR_TYPES[t.name]
+
+    if t.pointer:
+        if t.name == types.VOID.name:
+            return ir.PointerType(ir.IntType(8))
+        return base.as_pointer()
+    return base
+
+
+def is_signed(t: types.Type) -> bool:
+    return t.name in SIGNED_NAMES
+
+
+def is_void(t: types.Type) -> bool:
+    return t.name == types.VOID.name and not t.pointer
+
+
+def strip_const(t: types.Type) -> types.Type:
+    return replace(t, const=False)
 
 
 class IRGenerator:
@@ -44,8 +67,8 @@ class IRGenerator:
         return self.module
 
     def declare_function(self, func: ast.Function) -> None:
-        arg_types = [TYPE_MAP[a.type] for a in func.args]
-        ret_type = TYPE_MAP[func.return_type]
+        arg_types = [llvm_type(a.type) for a in func.args]
+        ret_type = llvm_type(func.return_type)
         fnty = ir.FunctionType(ret_type, arg_types)
         llvm_func = ir.Function(self.module, fnty, name=func.name)
 
@@ -69,7 +92,7 @@ class IRGenerator:
         self.gen_block(func.body)
 
         if not self.builder.block.is_terminated:
-            self.builder.ret_void() if func.return_type == types.VOID else self.builder.unreachable()
+            self.builder.ret_void() if is_void(func.return_type) else self.builder.unreachable()
 
     def gen_block(self, body: list[ast.ASTNode]) -> None:
         for stmt in body:
@@ -102,8 +125,8 @@ class IRGenerator:
         self.builder.ret(value)
 
     def gen_let(self, node: ast.Let) -> None:
-        llvm_type = TYPE_MAP[node.type]
-        alloca = self.builder.alloca(llvm_type, name=node.name)
+        alloca_type = llvm_type(node.type)
+        alloca = self.builder.alloca(alloca_type, name=node.name)
         if node.value is not None:
             value = self.gen_expr(node.value)
             value = self.convert(value, node.value.type, node.type)
@@ -111,7 +134,10 @@ class IRGenerator:
         self.scope[node.name] = alloca
 
     def gen_assignment(self, node: ast.Assignment) -> None:
-        ptr = self.scope[node.destination.name]
+        if isinstance(node.destination, ast.Dereference):
+            ptr = self.builder.load(self.scope[node.destination.value.name])
+        else:
+            ptr = self.scope[node.destination.name]
         dest_type = node.destination.type
 
         value = self.gen_expr(node.source)
@@ -123,7 +149,7 @@ class IRGenerator:
 
         current = self.builder.load(ptr)
         op = node.op[:-1]
-        result = self.gen_arith(op, dest_type in SIGNED, current, value)
+        result = self.gen_arith(op, is_signed(dest_type), current, value)
         self.builder.store(result, ptr)
 
     def gen_if(self, node: ast.If) -> None:
@@ -192,6 +218,11 @@ class IRGenerator:
                 return self.gen_binop(node)
             case ast.FuncCall():
                 return self.gen_call(node)
+            case ast.Pointer():
+                return self.scope[node.name]
+            case ast.Dereference():
+                ptr_value = self.builder.load(self.scope[node.value.name], name=f"{node.value.name}.ptr")
+                return self.builder.load(ptr_value)
 
     def gen_unary(self, node: ast.UnaryOperation) -> ir.Value:
         value = self.gen_expr(node.right)
@@ -200,6 +231,8 @@ class IRGenerator:
             return self.builder.not_(value)
         elif node.operator == "~":
             return self.builder.not_(value)
+        elif node.operator == "-":
+            return self.builder.neg(value)
         raise NotImplementedError(node.operator)
 
     def gen_binop(self, node: ast.BinaryOperation) -> ir.Value:
@@ -219,7 +252,7 @@ class IRGenerator:
         common = self.common_type(node.left.type, node.right.type)
         lhs = self.convert(self.gen_expr(node.left), node.left.type, common)
         rhs = self.convert(self.gen_expr(node.right), node.right.type, common)
-        signed = common in SIGNED
+        signed = is_signed(common)
 
         if op in ARITH_OPS:
             return self.gen_arith(op, signed, lhs, rhs)
@@ -261,28 +294,28 @@ class IRGenerator:
         return self.builder.call(llvm_func, args)
 
     def common_type(self, a: types.Type, b: types.Type) -> types.Type:
-        if a == b:
+        if strip_const(a) == strip_const(b):
             return a
-        if (a, b) in types.IMPLICIT_CONVERSIONS:
+        if (strip_const(a), strip_const(b)) in types.IMPLICIT_CONVERSIONS:
             return b
         return a
 
     def convert(self, value: ir.Value, src: types.Type, dst: types.Type) -> ir.Value:
-        if src == dst:
+        if strip_const(src) == strip_const(dst):
             return value
 
-        llvm_src = TYPE_MAP[src]
-        llvm_dst = TYPE_MAP[dst]
+        llvm_src = llvm_type(src)
+        llvm_dst = llvm_type(dst)
 
-        if dst == types.BOOL:
+        if dst.name == types.BOOL.name:
             zero = ir.Constant(llvm_src, 0)
             return self.builder.icmp_signed("!=", value, zero)
 
-        if src == types.BOOL:
+        if src.name == types.BOOL.name:
             return self.builder.zext(value, llvm_dst)
 
         if llvm_dst.width > llvm_src.width:
-            return self.builder.sext(value, llvm_dst) if src in SIGNED else self.builder.zext(value, llvm_dst)
+            return self.builder.sext(value, llvm_dst) if is_signed(src) else self.builder.zext(value, llvm_dst)
         elif llvm_dst.width < llvm_src.width:
             return self.builder.trunc(value, llvm_dst)
         else:

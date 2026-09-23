@@ -4,12 +4,19 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Type:
     name: str
+    const: bool = False
+    pointer: bool = False
 
     def __str__(self) -> str:
-        return self.name
+        prefix = ""
+        if self.pointer:
+            prefix += "*"
+        if self.const:
+            prefix += "const "
+        return f"{prefix}{self.name}"
 
     def __repr__(self) -> str:
-        return self.name
+        return self.__str__()
 
 U8  = Type("u8")
 U16 = Type("u16")

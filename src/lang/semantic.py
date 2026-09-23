@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from lang import ast, types
 from lang.span import Span
@@ -92,7 +92,7 @@ class Analyzer:
             
             params = [(a.name, self.resolve_type(a, a.type)) for a in func.args]
 
-            ret = types.VOID if func.return_type == "?" else self.resolve_type(func, func.return_type)
+            ret = types.VOID if func.return_type is None else self.resolve_type(func, func.return_type)
             func.return_type = ret
             self.functions[func.name] = Signature(func.name, params, ret)
 
@@ -104,7 +104,7 @@ class Analyzer:
             if self.scope.lookup(arg.name) is not None:
                 self.error(arg, f"argument `{arg.name}` is already declared")
                 continue
-            self.scope.declare(Symbol(arg.name, ty))
+            self.scope.declare(Symbol(arg.name, ty, ty.const))
             arg.type = ty
         self.check_block(func.body, new_scope=False)
         self.pop()
@@ -140,11 +140,11 @@ class Analyzer:
     def check_return(self, node: ast.Return) -> None:
         expected = self.current.return_type
         if node.value is None:
-            if expected != types.VOID:
+            if not Analyzer.is_void(expected):
                 self.error(node, f"expected a return value of type `{expected}`")
             return
         actual = self.check_expr(node.value)
-        if expected == types.VOID:
+        if Analyzer.is_void(expected):
             self.error(node.value, "cannot return a value from `void` function")
             return
         self.coerce(node.value, actual, expected)
@@ -161,21 +161,32 @@ class Analyzer:
         self.coerce(node, self.check_expr(node), types.BOOL)
 
     def check_assignment(self, node: ast.Assignment) -> None:
-        symbol = self.scope.lookup(node.destination.name)
+        is_deref = isinstance(node.destination, ast.Dereference)
+        target = node.destination.value if is_deref else node.destination
+
+        symbol = self.scope.lookup(target.name)
         value = self.check_expr(node.source)
         if symbol is None:
-            self.error(node.destination, f"identifier `{node.destination.name}` is not found in current scope")
+            self.error(node.destination, f"identifier `{target.name}` is not found in current scope")
             return
         elif symbol.const:
             self.error(node.destination, f"`{symbol.name}` is a constant")
 
-        node.destination.type = symbol.type
+        if is_deref:
+            if not symbol.type.pointer:
+                self.error(node.destination, f"`{symbol.name}` is not a pointer")
+                return
+            dest_type = replace(symbol.type, pointer=False)
+        else:
+            dest_type = symbol.type
+
+        node.destination.type = dest_type
 
         if node.op == "=":
-            self.coerce(node.source, value, symbol.type)
+            self.coerce(node.source, value, dest_type)
         else:
-            if not Analyzer.numeric_compatible(symbol.type):
-                self.error(node.destination, f"`{symbol.type}` is not numeric or numeric-compatible")
+            if not Analyzer.numeric_compatible(dest_type):
+                self.error(node.destination, f"`{dest_type}` is not numeric or numeric-compatible")
             if not Analyzer.numeric_compatible(value):
                 self.error(node.destination, f"`{value}` is not numeric or numeric-compatible")
 
@@ -184,6 +195,17 @@ class Analyzer:
         node.type = result
         return result
 
+    def check_ident(self, node: ast.ASTNode, deref: bool = False) -> types.Type:
+        symbol = self.scope.lookup(node.name)
+        if symbol is None:
+            self.error(node, f"identifier `{node.name}` is not found in current scope")
+            return types.ERROR
+        if not symbol.type.pointer and deref:
+            self.error(node, f"identifier `{node.name}` type is not a pointer")
+            return types.ERROR
+
+        return symbol.type
+
     def check_expr_inner(self, node: ast.ASTNode) -> types.Type:
         match node:
             case ast.NumberLiteral():
@@ -191,22 +213,21 @@ class Analyzer:
             case ast.BooleanLiteral():
                 return types.BOOL
             case ast.Identifier():
-                symbol = self.scope.lookup(node.name)
-                if symbol is None:
-                    self.error(node, f"identifier `{node.name}` is not found in current scope")
-                    return types.ERROR
-
-                return symbol.type
+                return self.check_ident(node)
+            case ast.Pointer():
+                return replace(self.check_ident(node), pointer=True)
+            case ast.Dereference():
+                return replace(self.check_ident(node.value), pointer=False)
             case ast.UnaryOperation():
                 ty = self.check_expr(node.right)
 
-                if ty == types.VOID:
+                if Analyzer.is_void(ty):
                     self.error(node.left, "expression cannot have `void` type")
 
                 if node.operator == "!":
                     self.coerce(node.right, ty, types.BOOL)
                     return types.BOOL
-                elif node.operator == "~":
+                elif node.operator in ("~", "-"):
                     if not Analyzer.numeric_compatible(ty):
                         self.error(node.right, f"`{ty}` is not numeric or numeric-compatible")
                         return types.ERROR
@@ -219,9 +240,9 @@ class Analyzer:
                 right = self.check_expr(node.right)
                 op = node.operator
 
-                if left == types.VOID:
+                if Analyzer.is_void(left):
                     self.error(node.left, "expression cannot have `void` type")
-                elif right == types.VOID:
+                elif Analyzer.is_void(right):
                     self.error(node.right, "expression cannot have `void` type")
 
                 if op in ARITHMETIC:
@@ -257,37 +278,44 @@ class Analyzer:
 
     def check_let(self, node: ast.Let) -> None:
         declared = None
-        if node.type != "?":
+        if node.type is not None:
             declared = self.resolve_type(node, node.type)
 
-        if declared == types.VOID:
+        if declared is not None and Analyzer.is_void(declared):
             self.error(node, "let cannot have `void` type")
 
         value_type = None
         if node.value is not None:
             value_type = self.check_expr(node.value)
 
-        if value_type == types.VOID:
+        if value_type is not None and Analyzer.is_void(value_type):
             self.error(node.value, "initializer cannot have `void` type")
 
         type = declared or value_type or types.ERROR
 
-        if declared is not None:
+        if declared is not None and value_type is not None:
             self.coerce(node.value, declared, value_type)
 
         node.type = type
 
-        if not self.scope.declare(Symbol(node.name, type, node.const)):
+        if not self.scope.declare(Symbol(node.name, type, type.const)):
             self.error(node, f"`{node.name}` is already declared in this scope")
 
-    def resolve_type(self, node, name: str) -> types.Type:
-        if name != "?" and name in types.BUILTIN:
-            return types.BUILTIN[name]
+    def resolve_type(self, node, type: ast.Type) -> types.Type:
+        name = type.type
+        if name in types.BUILTIN:
+            base = types.BUILTIN[name]
+            return types.Type(base.name, const=type.const, pointer=type.pointer)
         self.error(node, f"unknown type: `{name}`")
         return types.ERROR
 
     def can_convert(src: types.Type, dst: types.Type) -> bool:
+        src = replace(src, const=False)
+        dst = replace(dst, const=False)
         return src == dst or (src, dst) in types.IMPLICIT_CONVERSIONS
+
+    def is_void(type: types.Type) -> bool:
+        return type.name == types.VOID.name and not type.pointer
 
     def coerce(self, node, actual: types.Type, expected: types.Type) -> None:
         if types.ERROR in (actual, expected):
@@ -307,7 +335,7 @@ class Analyzer:
             return types.ERROR
 
     def numeric_compatible(type: types.Type) -> bool:
-        if type in types.NUMERIC:
+        if replace(type, const=False) in types.NUMERIC:
             return True
         else:
             for t in types.NUMERIC:

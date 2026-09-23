@@ -12,14 +12,20 @@ class Program(ASTNode):
     functions: list["Function"]
 
 @dataclass
+class Type(ASTNode):
+    type: str | types.Type
+    const: bool
+    pointer: bool
+
+@dataclass
 class Argument(ASTNode):
     name: str
-    type: str | types.Type
+    type: Type
 
 @dataclass
 class Function(ASTNode):
     name: str
-    return_type: str | types.Type
+    return_type: Type
     args: list[Argument]
     body: list[ASTNode]
 
@@ -43,6 +49,15 @@ class Identifier(ASTNode):
     type: types.Type | None = field(default=None, kw_only=True, compare=False, repr=False)
 
 @dataclass
+class Dereference(ASTNode):
+    value: ASTNode
+
+@dataclass
+class Pointer(ASTNode):
+    name: str
+    type: types.Type | None = field(default=None, kw_only=True, compare=False, repr=False)
+
+@dataclass
 class BinaryOperation(ASTNode):
     left: ASTNode
     operator: str
@@ -58,9 +73,8 @@ class UnaryOperation(ASTNode):
 @dataclass
 class Let(ASTNode):
     name: str
-    type: str | types.Type
+    type: Type
     value: ASTNode
-    const: bool
 
 @dataclass
 class Assignment(ASTNode):
