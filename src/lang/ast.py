@@ -85,3 +85,16 @@ class If(ASTNode):
     body: list[ASTNode]
     branches: list[ElseIf]
     fallback: list[ASTNode]
+
+@dataclass
+class While(ASTNode):
+    condition: ASTNode
+    body: list[ASTNode]
+
+@dataclass
+class Break(ASTNode):
+    pass
+
+@dataclass
+class Continue(ASTNode):
+    pass

@@ -260,6 +260,16 @@ class Parser:
                         return self.parse_let()
                     case "if":
                         return self.parse_if()
+                    case "while":
+                        return self.parse_while()
+                    case "break":
+                        self.advance()
+                        self.expect(TokenKind.Semicolon)
+                        return ast.Break()
+                    case "continue":
+                        self.advance()
+                        self.expect(TokenKind.Semicolon)
+                        return ast.Continue()
             case TokenKind.Identifier:
                 next = self.peek(True)
                 match next.kind:
@@ -460,3 +470,10 @@ class Parser:
         self.expect(TokenKind.Keyword, "else")
         block = self.parse_block()
         return block
+
+    def parse_while(self) -> ast.While:
+        start = self.expect(TokenKind.Keyword, "while")
+        condition = self.parse_expression()
+        block = self.parse_block()
+
+        return ast.While(condition, block, span=start.span.to(self.prev_span()))

@@ -66,6 +66,7 @@ class Analyzer:
         self.scope = Scope()
         self.functions = {}
         self.current = None
+        self.loop_depth = 0
 
     def error(self, node: ast.ASTNode | Span | None, message: str) -> None:
         span = node.span if isinstance(node, ast.ASTNode) else node
@@ -127,6 +128,12 @@ class Analyzer:
                 self.check_return(node)
             case ast.If():
                 self.check_if(node)
+            case ast.While():
+                self.check_while(node)
+            case ast.Break():
+                self.check_loop_control(node, "break")
+            case ast.Continue():
+                self.check_loop_control(node, "continue")
             case _:
                 self.check_expr(node)
 
@@ -307,3 +314,13 @@ class Analyzer:
                 if Analyzer.can_convert(type, t):
                     return True
         return False
+
+    def check_while(self, node: ast.ASTNode) -> None:
+        self.check_condition(node.condition)
+        self.loop_depth += 1
+        self.check_block(node.body)
+        self.loop_depth -= 1
+
+    def check_loop_control(self, node: ast.ASTNode, keyword: str) -> None:
+        if self.loop_depth == 0:
+            self.error(node, f"`{keyword}` should be used inside a loop")

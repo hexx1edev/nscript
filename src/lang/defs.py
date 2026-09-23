@@ -1,4 +1,4 @@
-KEYWORDS = ("fn", "return", "let", "const", "if", "else")
+KEYWORDS = ("fn", "return", "let", "const", "if", "else", "while", "continue", "break")
 BOOLEAN = ("true", "false")
 BASE = ("+", "-", "*", "/", "=", "<", ">", "!", "%", "|", "&", "^", "~")
 SPECIAL = ("->", "=")

@@ -35,7 +35,7 @@ These are language things:
 - [x] Numeric types
 - [x] Boolean type
 - [x] If->else if->else statements
-- [ ] While loops
+- [x] While loops
 - [ ] For loops
 - [ ] String pointers
 - [ ] Raw pointers

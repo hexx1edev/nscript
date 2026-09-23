@@ -6,11 +6,13 @@ import lang.parser
 import lang.semantic
 from backend import codegen, compiler
 import argparse
+import pprint
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nscript")
     parser.add_argument("source", help="path to the source file")
     parser.add_argument("-o", "--output", default="a.out", help="output file path")
+    parser.add_argument("-ast", "--export-ast", help="output file path", action="store_true")
     return parser
 
 def run() -> int:
@@ -55,10 +57,13 @@ def run() -> int:
         eprint(f"aborting due to {len(errors)} error(s)")
         return 1
 
-    generator = codegen.IRGenerator(program, "prog")
-    module = generator.generate()
-
-    compiler.compile_to_object(module, args.output)
+    if args.export_ast:
+        pprint.pprint(program)
+    else:
+        generator = codegen.IRGenerator(program, "prog")
+        module = generator.generate()
+    
+        compiler.compile_to_object(module, args.output)
 
     return 0
 

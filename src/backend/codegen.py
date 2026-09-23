@@ -25,6 +25,7 @@ class IRGenerator:
     param_types: dict[str, list[types.Type]]
     builder: ir.IRBuilder | None
     scope: dict[str, ir.AllocaInstr]
+    loop_stack: list[tuple[ir.Block, ir.Block]]
 
     def __init__(self, program: ast.Program, name: str):
         self.program = program
@@ -33,6 +34,7 @@ class IRGenerator:
         self.param_types = {}
         self.builder = None
         self.scope = {}
+        self.loop_stack = []
 
     def generate(self) -> ir.Module:
         for func in self.program.functions:
@@ -83,6 +85,12 @@ class IRGenerator:
                 self.gen_assignment(node)
             case ast.If():
                 self.gen_if(node)
+            case ast.While():
+                self.gen_while(node)
+            case ast.Break():
+                self.builder.branch(self.loop_stack[-1][1])
+            case ast.Continue():
+                self.builder.branch(self.loop_stack[-1][0])
             case _:
                 self.gen_expr(node)
 
@@ -148,6 +156,27 @@ class IRGenerator:
             self.gen_block(fallback)
             if not self.builder.block.is_terminated:
                 self.builder.branch(end_block)
+
+    def gen_while(self, node: ast.While) -> None:
+        cond_block = self.builder.append_basic_block("while.cond")
+        body_block = self.builder.append_basic_block("while.body")
+        end_block = self.builder.append_basic_block("while.end")
+
+        self.builder.branch(cond_block)
+
+        self.builder.position_at_end(cond_block)
+        cond_value = self.gen_expr(node.condition)
+        cond_value = self.convert(cond_value, node.condition.type, types.BOOL)
+        self.builder.cbranch(cond_value, body_block, end_block)
+
+        self.builder.position_at_end(body_block)
+        self.loop_stack.append((cond_block, end_block))
+        self.gen_block(node.body)
+        self.loop_stack.pop()
+        if not self.builder.block.is_terminated:
+            self.builder.branch(cond_block)
+
+        self.builder.position_at_end(end_block)
 
     def gen_expr(self, node: ast.ASTNode) -> ir.Value:
         match node:
